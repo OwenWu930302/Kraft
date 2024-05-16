@@ -1,2 +1,2 @@
-# shiny-fortnight
+# Kraft
 NUK Java Programming Project
