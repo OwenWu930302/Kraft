@@ -25,9 +25,9 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
         // 加載圖片
         try {
             images[0] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
-            images[1] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\1.png"));
+            images[1] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
             images[2] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
-            images[3] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\1.png"));
+            images[3] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
             images[4] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
             images[5] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
         }
@@ -117,13 +117,14 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
 
         g.drawImage(offscreen, 0, 0, this);
     }
-
+    //圖形大小
+    private int t=20;
     private void drawCube(Graphics2D g2d, double x, double y, double z) {
         double[][] transformedVertices = new double[8][];
 
         for (int i = 0; i < cubeVertices.length; i++) {
             double[] v = cubeVertices[i];
-            transformedVertices[i] = transformPoint(v[0]*20 + x, v[1]*20 + y, v[2]*20 + z);
+            transformedVertices[i] = transformPoint(v[0]*t + x, v[1]*t + y, v[2]*t + z);
         }
 
         for (int i = 0; i < cubeFaces.length; i++) {
@@ -139,7 +140,8 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
             }
 
             g2d.setClip(poly);
-            g2d.drawImage(images[i], poly.getBounds().x, poly.getBounds().y, poly.getBounds().width, poly.getBounds().height, null);
+            g2d.drawImage(images[i], poly.getBounds().x, poly.getBounds().y, poly.getBounds().width, poly.getBounds().height,null
+                    );
             g2d.setClip(null);
         }
     }
@@ -152,16 +154,18 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
 
     public void keyPressed(KeyEvent e) {
         int keyCode = e.getKeyCode();
-        double moveStep = 0.1;
+        double moveStep = 2;
         double rotateStep = 0.05;
         if (keyCode == KeyEvent.VK_W) {
-            cameraZ += moveStep;
+            //cameraZ += moveStep;
+            t+=1;
         } else if (keyCode == KeyEvent.VK_S) {
-            cameraZ -= moveStep;
+            //cameraZ -= moveStep;
+            t-=1;
         } else if (keyCode == KeyEvent.VK_A) {
-            cameraX -= moveStep;
-        } else if (keyCode == KeyEvent.VK_D) {
             cameraX += moveStep;
+        } else if (keyCode == KeyEvent.VK_D) {
+            cameraX -= moveStep;
         }
         repaint();
     }
