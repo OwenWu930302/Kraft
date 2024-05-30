@@ -1,0 +1,234 @@
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
+import java.awt.image.BufferedImage;
+import java.util.*;
+
+public class Simple3DCamera extends Frame implements KeyListener, WindowListener, MouseListener, MouseMotionListener {
+    private static final int WIDTH = 800;
+    private static final int HEIGHT = 600;
+
+    private double cameraX = 0.0;
+    private double cameraY = 0.0;
+    private double cameraZ = -5.0;
+    private double cameraAngleX = 0.0;
+    private double cameraAngleY = 0.0;
+
+    private int lastMouseX;
+    private int lastMouseY;
+    private boolean dragging = false;
+    private BufferedImage[] images = new BufferedImage[6];
+
+    private double smallCubeX = 0.0;
+    private double smallCubeY = 0.0;
+    private double smallCubeZ = 0.0;
+
+    public void CubeDrawer() {
+        // Load images
+        try {
+            images[0] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            images[1] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            images[2] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            images[3] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            images[4] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            images[5] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Error loading images");
+        }
+    }
+
+    private double[][] cubeVertices = {
+            {-1, -1, -1},
+            {-1, -1, 1},
+            {-1, 1, -1},
+            {-1, 1, 1},
+            {1, -1, -1},
+            {1, -1, 1},
+            {1, 1, -1},
+            {1, 1, 1}
+    };
+
+    private int[][] cubeFaces = {
+            {0, 1, 3, 2}, // Front
+            {4, 5, 7, 6}, // Back
+            {0, 1, 5, 4}, // Bottom
+            {2, 3, 7, 6}, // Top
+            {0, 2, 6, 4}, // Left
+            {1, 3, 7, 5}  // Right
+    };
+
+    public Simple3DCamera() {
+        super("Simple 3D Camera");
+        setSize(WIDTH, HEIGHT);
+        addKeyListener(this);
+        addMouseListener(this);
+        addMouseMotionListener(this);
+        addWindowListener(this);
+        setFocusable(true);
+        setResizable(false);
+        setVisible(true);
+        CubeDrawer();
+    }
+
+    private double[] projectPoint(double x, double y, double z) {
+        // Apply perspective projection
+        double fov = 256; // Field of view factor
+        double scale = fov / (fov + z);
+        double projectedX = x * scale + WIDTH / 2;
+        double projectedY = -y * scale + HEIGHT / 2;
+        return new double[]{projectedX, projectedY};
+    }
+
+    private double[] transformPoint(double x, double y, double z) {
+        x -= cameraX;
+        y -= cameraY;
+        z -= cameraZ;
+
+        double cosX = Math.cos(cameraAngleX);
+        double sinX = Math.sin(cameraAngleX);
+        double tmpY = y * cosX - z * sinX;
+        double tmpZ = y * sinX + z * cosX;
+
+        double cosY = Math.cos(cameraAngleY);
+        double sinY = Math.sin(cameraAngleY);
+        double tmpX = x * cosY + tmpZ * sinY;
+        tmpZ = -x * sinY + tmpZ * cosY;
+        return new double[]{tmpX, tmpY, tmpZ};
+    }
+
+    public void update(Graphics g) {
+        paint(g);
+    }
+
+    public void paint(Graphics g) {
+        super.paint(g);
+        Graphics2D g2d = (Graphics2D) g;
+
+        Image offscreen = createImage(WIDTH, HEIGHT);
+        Graphics2D offG2d = (Graphics2D) offscreen.getGraphics();
+
+        offG2d.setColor(Color.BLACK);
+        offG2d.fillRect(0, 0, WIDTH, HEIGHT);
+
+        drawCube(offG2d, 0, 0, 0, 100); // Draw the main cube
+
+        drawCube(offG2d, smallCubeX, smallCubeY, smallCubeZ, 50); // Draw the small cube
+
+        g.drawImage(offscreen, 0, 0, this);
+    }
+
+    private void drawCube(Graphics2D g2d, double x, double y, double z, int size) {
+        double[][] transformedVertices = new double[8][];
+        for (int i = 0; i < cubeVertices.length; i++) {
+            double[] v = cubeVertices[i];
+            double[] transformedV = transformPoint((v[0] + x) * size, (v[1] + y) * size, (v[2] + z) );
+            transformedVertices[i] = transformedV;
+        }
+
+        for (int i = 0; i < cubeFaces.length; i++) {
+            int[] face = cubeFaces[i];
+            Polygon poly = new Polygon();
+
+            for (int j = 0; j < face.length; j++) {
+                double[] v = transformedVertices[face[j]];
+                double[] proj = projectPoint(v[0], v[1], v[2]);
+                poly.addPoint((int) proj[0], (int) proj[1]);
+            }
+            g2d.setClip(poly);
+            g2d.drawImage(images[i], poly.getBounds().x, poly.getBounds().y, poly.getBounds().width, poly.getBounds().height, null);
+        }
+    }
+
+    public void keyPressed(KeyEvent e) {
+        int keyCode = e.getKeyCode();
+        double moveStep = 2;
+
+        if (keyCode == KeyEvent.VK_W) {
+            cameraZ += moveStep;
+        } else if (keyCode == KeyEvent.VK_S) {
+            cameraZ -= moveStep;
+        } else if (keyCode == KeyEvent.VK_A) {
+            cameraX += moveStep;
+        } else if (keyCode == KeyEvent.VK_D) {
+            cameraX -= moveStep;
+        } else if (keyCode == KeyEvent.VK_UP) {
+            smallCubeZ -= moveStep;
+        } else if (keyCode == KeyEvent.VK_DOWN) {
+            smallCubeZ += moveStep;
+        } else if (keyCode == KeyEvent.VK_LEFT) {
+            smallCubeX += moveStep;
+        } else if (keyCode == KeyEvent.VK_RIGHT) {
+            smallCubeX -= moveStep;
+        }
+        repaint();
+    }
+
+    public void keyReleased(KeyEvent e) {}
+
+    public void keyTyped(KeyEvent e) {}
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        if (dragging) {
+            int dx = e.getX() - lastMouseX;
+            int dy = e.getY() - lastMouseY;
+
+            double sensitivity = 0.01;
+            cameraAngleY += dx * sensitivity;
+            cameraAngleX += dy * sensitivity;
+
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {}
+
+    @Override
+    public void mouseClicked(MouseEvent e) {}
+
+    @Override
+    public void mouseEntered(MouseEvent e) {}
+
+    @Override
+    public void mouseExited(MouseEvent e) {}
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        dragging = true;
+        lastMouseX = e.getX();
+        lastMouseY = e.getY();
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        dragging = false;
+    }
+
+    public void windowClosing(WindowEvent e) {
+        dispose();
+        System.exit(0);
+    }
+
+    public void windowOpened(WindowEvent e) {}
+
+    public void windowClosed(WindowEvent e) {}
+
+    public void windowIconified(WindowEvent e) {}
+
+    public void windowDeiconified(WindowEvent e) {}
+
+    public void windowActivated(WindowEvent e) {}
+
+    public void windowDeactivated(WindowEvent e) {}
+
+    public static void main(String[] args) {
+        Simple3DCamera camera = new Simple3DCamera();
+    }
+}
