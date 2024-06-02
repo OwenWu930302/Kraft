@@ -1,0 +1,361 @@
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+public class Simple3DCamera extends Frame implements KeyListener, WindowListener, MouseListener, MouseMotionListener {
+    private static final int WIDTH = 500;
+    private static final int HEIGHT = 400;
+    private double cameraX = 0.0, cameraY = 0.0, cameraZ = -5.0;
+    private double cameraAngleX = 0.0, cameraAngleY = 0.0;
+    private int lastMouseX, lastMouseY;
+    private boolean dragging = false;
+    private BufferedImage[] images = new BufferedImage[6];
+    private double moveStep = 2;
+    private boolean gameFailed = false;
+    private Rectangle restartButtonBounds;
+    //找到小方塊組最大和最小的X，Y
+    private double max_X=0,min_X=0;
+    private double max_Y=0,min_Y=0;
+    private ArrayList<SmallCube> smallCubes = new ArrayList<>();
+
+
+    public Simple3DCamera() {
+        super("Simple 3D Camera");
+        setSize(WIDTH, HEIGHT);
+        addKeyListener(this);
+        addMouseListener(this);
+        addMouseMotionListener(this);
+        addWindowListener(this);
+        setFocusable(true);
+        setResizable(false);
+        setVisible(true);
+        loadCubeImages();
+        initializeSmallCubes();
+        find_X_Y();
+        System.out.println(gameFailed);
+    }
+    public void find_X_Y(){
+
+        for (SmallCube cube : smallCubes) {
+            min_X = Math.min(min_X, cube.x);
+            max_X = Math.max(max_X, cube.x);
+            min_Y = Math.min(min_Y, cube.y);
+            max_Y = Math.max(max_Y, cube.y);
+        }
+    }
+
+    // Load cube images
+    public void loadCubeImages() {
+        try {
+            for (int i = 0; i < 6; i++) {
+                images[i] = ImageIO.read(new File("C:\\Users\\User\\Desktop\\py\\2.png"));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Error loading images");
+        }
+    }
+
+    // Initialize small cubes
+    public void initializeSmallCubes() {
+        double startX = -5;
+        double startY = -5;
+        for (int i = 0; i <= 10; i++) {
+            for (int j = 0; j <= 5; j++) {
+                smallCubes.add(new SmallCube(startX + i, startY + j, 0.0));
+            }
+        }
+    }
+
+    private double[][] mainCubeVertices = {
+            {-1, -1, -1}, {-1, -1, 1}, {-1, 1, -1}, {-1, 1, 1},
+            {1, -1, -1}, {1, -1, 1}, {1, 1, -1}, {1, 1, 1}
+    };
+
+    private double[][] smallCubeVertices = {
+            {-0.5, -0.5, -0.5}, {-0.5, -0.5, 0.5}, {-0.5, 0.5, -0.5}, {-0.5, 0.5, 0.5},
+            {0.5, -0.5, -0.5}, {0.5, -0.5, 0.5}, {0.5, 0.5, -0.5}, {0.5, 0.5, 0.5}
+    };
+
+    private int[][] cubeFaces = {
+            {0, 1, 3, 2}, {4, 5, 7, 6}, {0, 1, 5, 4},
+            {2, 3, 7, 6}, {0, 2, 6, 4}, {1, 3, 7, 5}
+    };
+
+    private double[] projectPoint(double x, double y, double z) {
+        double fov = 256;
+        double scale = fov / (fov + z);
+        double projectedX = x * scale + WIDTH / 2;
+        double projectedY = -y * scale + HEIGHT / 2;
+        return new double[]{projectedX, projectedY};
+    }
+
+    private double[] transformPoint(double x, double y, double z) {
+        x -= cameraX;
+        y -= cameraY;
+        z -= cameraZ;
+
+        double cosX = Math.cos(cameraAngleX);
+        double sinX = Math.sin(cameraAngleX);
+        double tmpY = y * cosX - z * sinX;
+        double tmpZ = y * sinX + z * cosX;
+
+        double cosY = Math.cos(cameraAngleY);
+        double sinY = Math.sin(cameraAngleY);
+        double tmpX = x * cosY + tmpZ * sinY;
+        tmpZ = -x * sinY + tmpZ * cosY;
+        return new double[]{tmpX, tmpY, tmpZ};
+    }
+
+    @Override
+    public void update(Graphics g) {
+        paint(g);
+    }
+    private boolean isSmallCubeOnTopOfCube(double cubeX, double cubeY) {
+        boolean isInRangeX = cubeX >= min_X && cubeX <= max_X;
+        boolean isInRangeY = cubeY >= min_Y && cubeY <= max_Y;
+        return isInRangeX && isInRangeY;
+    }
+
+    public void animateSmallCube() {
+        final double gravity = 9.8;
+        final double[] fallingSpeed = {0};
+        new Thread(() -> {
+            while (true) {
+                fallingSpeed[0] += gravity * 0.1;
+                double newZ = cameraZ + fallingSpeed[0] * 0.1;
+                if (isSmallCubeOnTopOfCube(cameraX, cameraY) && newZ > 0) {
+                    cameraZ = 0.0;
+                    break;
+                } else {
+                    cameraZ = newZ;
+                    if (newZ > 30) {
+                        gameFailed = true;
+                        repaint();
+                        break;
+                    }
+                }
+                repaint();
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+    private void drawGameFailedScreen(Graphics2D g2d) {
+        Font font = new Font("微软雅黑", Font.BOLD, 48);
+        g2d.setFont(font);
+        g2d.setColor(Color.RED);
+        String message = "失敗!";
+        int messageWidth = g2d.getFontMetrics().stringWidth(message);
+        int x = (WIDTH - messageWidth) / 2;
+        int y = HEIGHT / 2;
+        g2d.drawString(message, x, y);
+
+        Font buttonFont = new Font("微软雅黑", Font.PLAIN, 24);
+        g2d.setFont(buttonFont);
+        g2d.setColor(Color.WHITE);
+        String restartMessage = "重玩";
+        int restartWidth = g2d.getFontMetrics().stringWidth(restartMessage);
+        int restartX = (WIDTH - restartWidth) / 2;
+        int restartY = HEIGHT / 2 + 50;
+        restartButtonBounds = new Rectangle(restartX, restartY - 24, restartWidth, 24);
+        g2d.drawString(restartMessage, restartX, restartY);
+
+    }
+
+    public void paint(Graphics g) {
+        super.paint(g);
+        Graphics2D g2d = (Graphics2D) g;
+
+        if (gameFailed) {
+            drawGameFailedScreen(g2d);
+        }
+        else {
+            Image offscreen = createImage(WIDTH, HEIGHT);
+            Graphics2D offG2d = (Graphics2D) offscreen.getGraphics();
+
+            if (cameraZ > 0) {
+                for (SmallCube cube : smallCubes) {
+                    drawSmallCube(offG2d, cube.x, cube.y, cube.z, smallCubeVertices);
+                }
+                drawCube(offG2d, 0, 0, 0, mainCubeVertices);
+            } else {
+                drawCube(offG2d, 0, 0, 0, mainCubeVertices);
+                for (SmallCube cube : smallCubes) {
+                    drawSmallCube(offG2d, cube.x, cube.y, cube.z, smallCubeVertices);
+                }
+            }
+            g.drawImage(offscreen, 0, 0, this);
+        }
+    }
+
+    private void drawCube(Graphics2D g2d, double x, double y, double z, double[][] vertices) {
+        draw(g2d, x, y, z, vertices, 100);
+    }
+
+    private void drawSmallCube(Graphics2D g2d, double x, double y, double z, double[][] vertices) {
+        draw(g2d, x, y, z, vertices, 50);
+    }
+
+    private void draw(Graphics2D g2d, double x, double y, double z, double[][] vertices, double size) {
+        double[][] transformedVertices = new double[8][];
+        for (int i = 0; i < vertices.length; i++) {
+            double[] v = vertices[i];
+            double[] transformedV = transformPoint((v[0] + x) * size, (v[1] + y) * size, (v[2] + z));
+            transformedVertices[i] = transformedV;
+        }
+
+        for (int i = 0; i < cubeFaces.length; i++) {
+            int[] face = cubeFaces[i];
+            Polygon poly = new Polygon();
+
+            for (int j = 0; j < face.length; j++) {
+                double[] v = transformedVertices[face[j]];
+                double[] proj = projectPoint(v[0], v[1], v[2]);
+                poly.addPoint((int) proj[0], (int) proj[1]);
+            }
+            g2d.setClip(poly);
+            g2d.drawImage(images[i], poly.getBounds().x, poly.getBounds().y, poly.getBounds().width, poly.getBounds().height, null);
+        }
+    }
+
+
+
+    private boolean isSmallCubeInMainCube(SmallCube cube) {
+        double cubeSize = 1.0; // Main cube size
+        return cube.x >= -cubeSize && cube.x <= cubeSize &&
+                cube.y >= -cubeSize && cube.y <= cubeSize;
+    }
+
+
+
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        int keyCode = e.getKeyCode();
+        if (keyCode == KeyEvent.VK_S) {
+            for (SmallCube cube : smallCubes) {
+                if (cube.z == 0) {
+                    // Add logic for S key if needed
+                }
+            }
+        } else if (keyCode == KeyEvent.VK_LEFT) {
+            for (SmallCube cube : smallCubes) {
+                cube.x += moveStep;
+            }
+        } else if (keyCode == KeyEvent.VK_RIGHT) {
+            for (SmallCube cube : smallCubes) {
+                cube.x -= moveStep;
+            }
+        } else if (keyCode == KeyEvent.VK_UP) {
+            for (SmallCube cube : smallCubes) {
+                cube.y += moveStep;
+            }
+        } else if (keyCode == KeyEvent.VK_DOWN) {
+            for (SmallCube cube : smallCubes) {
+                cube.y -= moveStep;
+            }
+        }
+
+        if(!isSmallCubeOnTopOfCube(1.5,1.5)) { //如果離開地板的範圍則落下
+            animateSmallCube();
+        }
+
+
+
+        repaint();
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {}
+
+    @Override
+    public void keyTyped(KeyEvent e) {}
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        if (dragging) {
+            int dx = e.getX() - lastMouseX;
+            int dy = e.getY() - lastMouseY;
+            double sensitivity = 0.01;
+            cameraAngleY += dx * sensitivity;
+            cameraAngleX -= dy * sensitivity;
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+            repaint();
+        }
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {}
+
+    @Override
+    public void mouseClicked(MouseEvent e) {}
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        dragging = true;
+        lastMouseX = e.getX();
+        lastMouseY = e.getY();
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        dragging = false;
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {}
+
+    @Override
+    public void mouseExited(MouseEvent e) {}
+
+    @Override
+    public void windowOpened(WindowEvent e) {}
+
+    @Override
+    public void windowClosing(WindowEvent e) {
+        dispose();
+    }
+
+    @Override
+    public void windowClosed(WindowEvent e) {}
+
+    @Override
+    public void windowIconified(WindowEvent e) {}
+
+    @Override
+    public void windowDeiconified(WindowEvent e) {}
+
+    @Override
+    public void windowActivated(WindowEvent e) {}
+
+    @Override
+    public void windowDeactivated(WindowEvent e) {}
+
+    private class SmallCube {
+        double x, y, z;
+
+        SmallCube(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+
+
+    }
+
+    public static void main(String[] args) {
+        new Simple3DCamera();
+
+    }
+}
