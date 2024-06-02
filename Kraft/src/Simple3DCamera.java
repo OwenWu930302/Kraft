@@ -15,7 +15,7 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
     private int lastMouseY;
     private boolean dragging = false;
 
-    private double[][] cubeVertices = {
+    private final double[][] cubeVertices = {
             {-1, -1, -1},
             {-1, -1, 1},
             {-1, 1, -1},
@@ -26,7 +26,7 @@ public class Simple3DCamera extends Frame implements KeyListener, WindowListener
             {1, 1, 1}
     };
 
-    private int[][] cubeFaces = {
+    private final int[][] cubeFaces = {
             {0, 1, 3, 2}, // 前面
             {4, 5, 7, 6}, // 后面
             {0, 1, 5, 4}, // 底面
